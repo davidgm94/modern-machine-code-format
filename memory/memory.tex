@@ -1,0 +1,60 @@
+\documentclass[12pt]{article}
+\usepackage{hyperref}
+\usepackage[margin=2.0cm]{geometry}
+\usepackage{listings}
+\lstset{
+	basicstyle=\small\ttfamily,
+	columns=flexible
+	breaklines=true
+}
+\title{\vspace{-2.5cm}\textbf{Prototyping a Modern Machine Code File Format For Libraries and Executables}}
+\author{David Gonzalez Martin}
+\date{\vspace{-5ex}}
+
+\begin{document}
+	\maketitle{\vspace{-1.5cm}}
+	\newpage
+	\tableofcontents
+	\newpage
+	\section{Introduction}
+    TODO
+	\subsection{Context and Rationale}
+	TODO
+	\subsection{Goals}
+	\begin{itemize}
+		\item Suppress the distinction between dynamic and static libraries with respect to the file format. One file format should comprehend both and both could live in the same binary, giving the chance to the linker to pick the desired linking mode.
+		\item Eliminate the distinction between command line interface (CLI) programs and libraries. Most Linux utilities, like grep or ls, are standalone programs which link libraries to fulfill their purpose. Instead, the proposal is to have a single binary file which can act both as a library and as an executable. \textbf{Does this belong here?} This will be achieved by adding some entry points to the binary in case the binary is being executed from a shell so that the user is able to interact properly with the functionality of the code hosted by the binary.
+		\paragraph{TODO: place this somewhere else:}However, the preferred way to link programs and scale is through using the binary and linking library functions into an executable, not calling out shell programs.
+		\item Allow the user of the format to have different programs hosted inside a single executable. This would allow good capabilities of customization and, what is more important, the following case:
+		\item Loader custom logic, allowing the user, among other abilities, to produce an in-memory code section fit for the used CPU architecture, features and instructions.
+		\paragraph{} There are a couple of additional ideas which are incredibly temptative to work on, such as implementing a feature system which is both extensible and efficient and implementing linking based on integer ids instead of names, but since the time constraint is not particularly long, they are out of the scope of this project for the time being.
+	\end{itemize}
+	\subsection{Impact on Sustainability and Diversity and Social-Ethical Influence}
+    TODO
+	\subsection{Used Method and Approach}
+    TODO
+	\subsection{Planning}
+	TODO
+	\subsection{Result Preview}
+	TODO
+	\subsection{Thesis Overview}
+	TODO	
+	\section{Resources and Approach}
+	TODO
+	\section{Results}
+	TODO
+	\section{Conclusion and Future Work}
+	TODO
+	%\section{Glossary}
+	%TODO
+
+%	\begin{thebibliography}{9}
+%		\bibitem{epyc}
+%		AMD Epyc 9654 https://www.amd.com/en/product/12191. Retrieved 24 October 2023.
+%		\bibitem{13900k}
+%		Intel Core i9 13900K https://www.intel.com/content/www/us/en/products/sku/236773/intel-core-i9-processor-14900k-36m-cache-up-to-6-00-ghz/specifications.html Retrieved 24 October 2023.
+%		\bibitem{crucialt700}
+%		Crucial T700 https://www.crucial.com/ssd/t700/CT1000T700SSD5.html Retrieved 24 October 2023.
+%	\end{thebibliography}
+%	TODO
+\end{document}
