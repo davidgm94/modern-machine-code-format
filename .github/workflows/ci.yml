@@ -1,0 +1,39 @@
+name: CI
+permissions: write-all
+on: 
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+jobs:
+  build_memory:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v3
+      - name: Compile LaTeX document
+        run: |
+          sudo apt update
+          sudo apt install texlive-full
+          mkdir public
+          cp memory/*.tex public
+          cd public
+          pdflatex memory.tex
+
+      - name: Upload PDF file
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v3
+        with:
+          name: memory.pdf
+          path: public/memory.pdf
+      - name: Create release tag
+        id: tag
+        run: |
+          echo "::set-output name=release_tag::memory_$(date +"%Y_%m_%d")"
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: ${{ steps.tag.outputs.release_tag }}
+          files: public/memory.pdf
