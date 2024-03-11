@@ -19,7 +19,9 @@
 	\section{Introduction}
     TODO
 	\subsection{Context and Rationale}
-	TODO
+	\paragraph{}In modern days there is just a ton of complexity in software, both for the developer and the user. World turned to web applications as a way to fill the gap that traditional software failed to master: cross-platform software. Programmers felt the need to forget about memory management and garbage collection started dominating most of common software, especially in the business field. Types were an obstacle to developers, who demanded more and more flexibility, and dynamic typing appeared, leading to the emergence of interpreters and just-in-time compilers.
+	\paragraph{}But this is not only about web and business software development. Systems programming is infected with this virus as well. The enormous complexity inherited from the times when UNIX was born has generated an overwhelming environment for both users and developers. Code is duplicated or triplicated, leaving the developer with the obligation to deal with more software than necessary and users see how binary files tend to multiply in their disk with no direct corelation with any new feature or improvement whatsoever. Modern compilers and operating systems and complex system software in general are about millions of lines of code, when Linux started out very simple, with just about 20 thousand lines of code. If you try to ship a videogame in Linux, it is a nightmare due to GNU libc versioning and proprietary drivers adhering to a version which may or may not match your system's version. Linux provides a stable syscall interface but no advantage is taken off this, translating from Microsoft land the so-called term "DLL hell".
+	\paragraph{}TODO: provide more ideas. Should this go in introduction?
 	\subsection{Goals}
 	\begin{itemize}
 		\item Suppress the distinction between dynamic and static libraries with respect to the file format. One file format should comprehend both and both could live in the same binary, giving the chance to the linker to pick the desired linking mode.
@@ -30,7 +32,7 @@
 		\paragraph{} There are a couple of additional ideas which are incredibly temptative to work on, such as implementing a feature system which is both extensible and efficient and implementing linking based on integer ids instead of names, but since the time constraint is not particularly long, they are out of the scope of this project for the time being.
 	\end{itemize}
 	\subsection{Impact on Sustainability and Diversity and Social-Ethical Influence}
-    TODO
+    Developing a new executable and library format will yield enormous gains in disk space, which will translate in files being in the operating system filesystem cache more frequently and thus leading to faster program loading and less CPU cache pollution. All of this will translate to less energy consumed by computers, but not only because of the previous factors mentioned. Correct CPU instruction selection is crucial to save both energy and time, as professor Daniel Lemire states in this blog post: https://lemire.me/blog/2024/02/19/measuring-energy-usage-regular-code-vs-simd-code/
 	\subsection{Used Method and Approach}
     TODO
 	\subsection{Planning}
