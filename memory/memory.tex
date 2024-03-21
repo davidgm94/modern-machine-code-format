@@ -23,6 +23,8 @@
 	\paragraph{}But this is not only about web and business software development. Systems programming is infected with this virus as well. The enormous complexity inherited from the times when UNIX was born has generated an overwhelming environment for both users and developers. Code is duplicated or triplicated, leaving the developer with the obligation to deal with more software than necessary and users see how binary files tend to multiply in their disk with no direct corelation with any new feature or improvement whatsoever. Modern compilers and operating systems and complex system software in general are about millions of lines of code, when Linux started out very simple, with just about 20 thousand lines of code. If you try to ship a videogame in Linux, it is a nightmare due to GNU libc versioning and proprietary drivers adhering to a version which may or may not match your system's version. Linux provides a stable syscall interface but no advantage is taken off this, translating from Microsoft land the so-called term "DLL hell".
 	\paragraph{}TODO: provide more ideas. Should this go in introduction?
 	\subsection{Goals}
+	\paragraph{}The general goal of the project is to untangle and reduce the complexity that modern operating systems have between redundant binary components and introduce simple solutions to some of latent problems that the unnecessary separation has been adding.	
+	\paragraph{}Some of the problems I have observed and I plan to tackle in my work are:
 	\begin{itemize}
 		\item Suppress the distinction between dynamic and static libraries with respect to the file format. One file format should comprehend both and both could live in the same binary, giving the chance to the linker to pick the desired linking mode.
 		\item Eliminate the distinction between command line interface (CLI) programs and libraries. Most Linux utilities, like grep or ls, are standalone programs which link libraries to fulfill their purpose. Instead, the proposal is to have a single binary file which can act both as a library and as an executable. \textbf{Does this belong here?} This will be achieved by adding some entry points to the binary in case the binary is being executed from a shell so that the user is able to interact properly with the functionality of the code hosted by the binary.
@@ -34,7 +36,11 @@
 	\subsection{Impact on Sustainability and Diversity and Social-Ethical Influence}
     Developing a new executable and library format will yield enormous gains in disk space, which will translate in files being in the operating system filesystem cache more frequently and thus leading to faster program loading and less CPU cache pollution. All of this will translate to less energy consumed by computers, but not only because of the previous factors mentioned. Correct CPU instruction selection is crucial to save both energy and time, as professor Daniel Lemire states in this blog post: https://lemire.me/blog/2024/02/19/measuring-energy-usage-regular-code-vs-simd-code/
 	\subsection{Used Method and Approach}
-    TODO
+	\paragraph{}This work will only be addressing the x86\_64 architecture along with the GNU/Linux operating system, for a matter of simplicity and time limitation.
+    
+    \paragraph{}One of the first developments to be made will be to write the skeleton of a very basic user-space loader, that is, a program that can load binary files into memory and execute them. This is possible in Linux and modern operating systems by using system calls like \verb|mmap| which allow the user to set some virtual memory chunk as executable. This program will serve as a way to verify the executable is well formed and that the code and relocations are the intended artifacts the programmer originally wanted.
+    
+    \paragraph{}At the same time, current executable and library formats will be examined to look for good concepts to integrate into this more modern format and bad practices to be avoided.
 	\subsection{Planning}
 	TODO
 	\subsection{Result Preview}
