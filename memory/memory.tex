@@ -8,7 +8,7 @@
 	breaklines=true
 }
 \title{\vspace{-2.5cm}\textbf{Prototyping a Simplified Machine Code File Format For Libraries and Executables}}
-\author{David Gonzalez Martin}
+\author{\textbf{Author}\\David Gonzalez Martin\\\textbf{Thesis advisor}\\Belen Bermejo Gonzalez\\\textbf{Coordinating professor}\\Josep Jorba Esteve}
 \date{\vspace{-5ex}}
 
 \begin{document}
@@ -18,7 +18,7 @@
 	\newpage
 	\section{Introduction}
 	\paragraph{} Nowadays modern software development has dramatically increased in complexity and both the user and the developer ends experiment problems around it. This work is aimed towards reducing the complexity when directly producing native executable and library binaries.
-	\paragraph{} The development of this thesis is fully open-source, so you can keep track of the progress\cite{self}.\\
+	\paragraph{} The development of this thesis is fully open-source, so you can keep track of the progress\cite{self}.
 	\subsection{Context and Rationale}
 	\paragraph{}In modern days there is significant complexity in software, both for the developer and the user. The paradigm for home computing shifted towards web applications as a way to fill the gap that traditional software failed to occupy: cross-platform software. The trend in the developer sector was to forget about memory management and garbage collection started dominating most of common software, especially in the business field. Types were an obstacle to developers, who demanded more and more flexibility, and dynamic typing appeared, leading to the emergence of interpreters and just-in-time compilers.
 	\paragraph{}Nevertheless, this cannot only be sensed in the web and business software development world. Systems programming is infected with this fashion as well.
@@ -28,21 +28,21 @@
 	\paragraph{}TODO: provide more ideas. Should this go in introduction?
 	\subsection{Goals}
 	\paragraph{}The general goal of the project is to untangle and reduce the complexity that modern operating systems have between redundant binary components and introduce simple solutions to some of latent problems that the unnecessary separation has been adding.	
-	\paragraph{}Some of the problems I have observed and I plan to tackle in my work are:
+	\paragraph{}Some of the problems that I have observed and that I would like to tackle in my work are:
 	\begin{itemize}
 		\item Suppress the distinction between dynamic and static libraries with respect to the file format. One file format should comprehend both and both could live in the same binary, giving the chance to the linker to pick the desired linking mode.
 		\item Eliminate the distinction between command line interface (CLI) programs and libraries. Most Linux utilities, like \verb|grep| or \verb|ls|, are standalone programs which link libraries to fulfill their purpose. Instead, the proposal is to have a single binary file which can act both as a library and as an executable.
-
 		\item Allow the user of the format to have different programs hosted inside a single executable. This would allow good capabilities of customization and, what is more important, the following case:
 		\item Loader custom logic, allowing the user, among other abilities, to produce an in-memory code section fit for the used CPU architecture, features and instructions.
 	\end{itemize}
 	\paragraph{} There are a couple of additional ideas which are incredibly temptative to work on, such as implementing a feature system which is both extensible and efficient and implementing linking based on integer ids instead of names, but since the time constraint is not particularly long, they are out of the scope of this project for the time being.
+	\paragraph{}Not to mention the topic of security, which is crucial in modern software and hardware. However, this is out of scope of the project for the time being.
 	\subsection{Impact on Sustainability and Diversity and Social-Ethical Influence}
     \paragraph{} Developing a new executable and library format will yield enormous gains in disk space, which will translate in files being in the operating system filesystem cache more frequently and thus leading to faster program loading and less CPU cache pollution. All of this will translate to less energy consumed by computers, but not only because of the previous factors mentioned. Correct CPU instruction selection is crucial to save both energy and time, as professor Daniel Lemire states \cite{lemire-energy}. 
 	\subsection{Used Method and Approach}
-	\paragraph{}This work will only be addressing the x86\_64 architecture along with the GNU/Linux operating system, for a matter of simplicity and time limitation.
+	\paragraph{}This work will only be addressing the x86\_64 architecture along with the GNU/Linux operating system, for a matter of simplicity and time limitation. For the same reason, no existing libraries will be used.
     
-    \paragraph{}One of the first developments to be made will be to write the skeleton of a very basic user-space loader, that is, a program that can load binary files into memory and execute them.
+    \paragraph{}The skeleton of the project will be a program which works both as a linker and as a loader, it being able to generate binaries, load them from disk and resolve relocations, as well as setting them up for execution.
     
     \paragraph{}At the same time, current executable and library formats will be examined to look for good concepts to integrate into this more modern format and bad practices to be avoided.
     
@@ -59,25 +59,96 @@
 
 	\subsection{Thesis Overview}
 	The main proposal of this work is to develop a prototype of a machine code format for both libraries and executable, aiming to simplify the current state of affairs. This targets the suppression of duplicities such as executables versus libraries, dynamic versus static linking, different relocation types and merging altogether, object format versus executable/library format, etc.
+	
 	\section{Resources and Approach}
-	TODO
-	\section{Results}
-		\paragraph{}TODO: this is a collection of ideas from previous sections to be developed more seriously and in detail.
-		\paragraph{}I have been doing some research on how to make consistent the relocation types between static and dynamic libraries and to me it feels like these are massively overcomplicated and that only using instruction pointer relative addressing (RIP-relative addressing in x86\_64) could work very well for both of them. This makes everything so much more simple, at the cost of not depending on any library which uses GOT, PLT or something similar, like GNU libc. For the same reason, this relative addressing has been chosen to have just 32-bit operands, so that no different types of relocations exist at all and pave the way for an implementation given the time constraint.
+	
+	\paragraph{}Since the target of this work is the x86\_64 architecture and the GNU/Linux operating system, the research on the state of affairs is going to be as well on the formats used by this platform, that is, the ELF specification and the System V ABI (for x86\_64).
+	\paragraph{}TODO: this is a collection of ideas from previous sections to be developed more seriously and in detail.
+
+
+	\subsection{A brief exploration of ELF}
+	
+	\paragraph{}ELF stands for Executable and Linkable Format and is a binary file format used by Linux and other UNIX-like operating systems, such as the BSD family and Solaris, among others.
+	\paragraph{}In what follows, different particularities of ELF which are relevant to this research will be described.
+	
+	\subsubsection{Types of ELF files}
+	
+	\paragraph{}According to the ELF specification\cite{elf-spec}, there are three main kinds of ELF files, also called by the spec as \textit{object} files:
+	\begin{itemize}
+		\item A relocatable file, which is supposed to be linked to other objects afterwards.
+		\item An executable file, which can be used for direct execution.
+		\item A shared object file, which may be used both to produce a bigger object file by linking to other objects or, primarily, can be linked at runtime with an executable file by the dynamic linker, and these are indexed by the program headers.
+	\end{itemize}
+	\paragraph{}However, by examining the \verb|e_type| field of the ELF header data structure, aside from the main types (\verb|ET_REL| for relocatable files, \verb|ET_EXEC| for executable files and \verb|ET_DYN| for shared object files), there is another type of file supported under the \verb|ET_CORE| tag, which refers mainly to core dumps.
+	\paragraph{TODO. Move this paragraph below? Detail better}It can be thought that this binary format supports a few use cases that were listed on the goals of this thesis, but in practice the diversification makes them to be far from close to each other. This is even more palpable when exemplified with existing libraries such the GNU libc. More detail on this will be given below.
+	
+	\subsubsection{Sections and program headers duality}
+	
+	\paragraph{}ELF files classify data into groups by means of both sections and segments. \paragraph{}Data in sections refer to all information valuable to the linking process and they are indexed by the section headers.
+	\paragraph{}On the other hand, the data contained in the program segments contain all the information needed for constructing the process or executable image, that is, the bytes that need to be in memory in order for the program to work properly.
+	\paragraph{}ELF being a general-purpose format, it has to support a wide variety of use cases in both the section and program headers.
+	\paragraph{}Therefore, section headers have to support cases with no apparent utility, such as null sections. Others types supported are very specific to certain cases, which are included in this bloated scheme of linking the equally swolen web of code. The paradigmatic case of this is again the GNU libc.
+	\paragraph{TODO QUOTE}
+	
+	\subsubsection{Sea of relocations}
+	\paragraph{}Relocations as such are described in a very generic way, which two (\verb|Elf64_Rel|) or three (\verb|Elf64_Rela|) generic fields. The relocation type is encoded as part of the \verb|r_info| field and is architecture-dependent.
+	\paragraph{}Since this work only deals with the x86\_64 CPU architecture, such part of the specification will be examined.
+	\paragraph{}Nevertheless, the original ELF specification, despite including information for Intel architectures, is previous to the creation of x86\_64, so another document must reached in order to retrieve some certain data about the relocation types for the flagship architecture of Intel and AMD.
+	\paragraph{}However, the existence of the relocation data in the original document can help the interested reader understand the growing complexity of linking technology. By the time the ELF specification was published, there were only three possible encodings for relocation types, two of which were actually relocations (where one exists with respect to the program counter).
+	
+	\paragraph{}The picture is indeed quite different when looking through the document which properly describes the relocation types for the newer x86 extension for, the AMD64 or x86\_64 System V ABI specification\cite{x86_64-abi-spec}. If there were only three options for relocation type in x86, for AMD64 there are a total amount of 38 possible values to encode. This, aside from the increasing complexity of types, has to do with the addition of different sizes, not only the 64-bit one but also 8-bit and 16-bit relocations.
+	
+	\paragraph{}TODO
+	
+	\paragraph{}TODO: talk about \href{https://www.redhat.com/en/blog/hardening-elf-binaries-using-relocation-read-only-relro}{https://www.redhat.com/en/blog/hardening-elf-binaries-using-relocation-read-only-relro}
+	
+	\subsection{Executables and libraries}
+	
+	\paragraph{Does this belong here?} This will be achieved by adding some entry points to the binary in case the binary is being executed from a shell so that the user is able to interact properly with the functionality of the code hosted by the binary.
+	
 	\paragraph{TODO: place this somewhere else:}However, the preferred way to link programs and scale is through using the binary and linking library functions into an executable, not calling out shell programs.
-	 \paragraph{Does this belong here?} This will be achieved by adding some entry points to the binary in case the binary is being executed from a shell so that the user is able to interact properly with the functionality of the code hosted by the binary.
-	  \paragraph{}This is possible in Linux and any modern operating system by using system calls like \verb|mmap| which allow the user to mark some allocated virtual memory region as executable. This program will serve as a way to verify the executable is correctly formed and to load the executable in memory without modifying any kernel source code.
-	  \paragraph{}This is due to the malleability that such method provides, giving me full control over the bytes generated, avoiding undesired byte output and making me easier to emit relocations in the middle of such code. While this ensures more control, the ability to have a more worthwhile code to show along the loader/linker program is lost, which I certainly believe is a fine trade-off to make since the interesting bit of this work is the linking and loading technology, not the code which is to be linked or loaded.
+	
+	\subsection{Dynamic and static libraries}
+	
+	\paragraph{}TODO
+	
+	\subsection{Relocation types}
+	
+	\paragraph{}I have been doing some research on how to make consistent the relocation types between static and dynamic libraries and to me it feels like these are massively overcomplicated and that only using instruction pointer relative addressing (RIP-relative addressing in x86\_64) could work very well for both of them. This makes everything so much more simple, at the cost of not depending on any library which uses GOT, PLT or something similar, like GNU libc. For the same reason, this relative addressing has been chosen to have just 32-bit operands, so that no different types of relocations exist at all and pave the way for an implementation given the time constraint.
+	
+	\subsection{Loader implementation}
+	
+	\paragraph{}This is possible in Linux and any modern operating system by using system calls like \verb|mmap| which allow the user to mark some allocated virtual memory region as executable. This program will serve as a way to verify the executable is correctly formed and to load the executable in memory without modifying any kernel source code.
+	
+	\subsection{Linker implementation}
+	
+	\paragraph{} TODO
+	
+	\subsection{Machine code generation}
+	
+	\paragraph{}This is due to the malleability that such method provides, giving me full control over the bytes generated, avoiding undesired byte output and making me easier to emit relocations in the middle of such code. While this ensures more control, the ability to have a more worthwhile code to show along the loader/linker program is lost, which I certainly believe is a fine trade-off to make since the interesting bit of this work is the linking and loading technology, not the code which is to be linked or loaded.
+	
+	\section{Results}
+	\paragraph{}TODO
+	
 	\section{Conclusion and Future Work}
-	TODO
-	%\section{Glossary}
-	%TODO
+	\paragraph{}TODO
+	
+	\section{Glossary}
+	\paragraph{}TODO
 
 	\begin{thebibliography}{9}
-		\bibitem{self}
-		Repository for this thesis:\\ \href{https://github.com/davidgm94/modern-machine-code-format/}{https://github.com/davidgm94/modern-machine-code-format/}\\Retrieved 28 May 2024.
+		\bibitem{self} \href{https://github.com/davidgm94/modern-machine-code-format/}{https://github.com/davidgm94/modern-machine-code-format/}\\
+		Retrieved 28 May 2024.
 		\bibitem{lemire-energy}
-		\href{https://lemire.me/blog/2024/02/19/measuring-energy-usage-regular-code-vs-simd-code}{https://lemire.me/blog/2024/02/19/measuring-energy-usage-regular-code-vs-simd-code/}\\Retrieved 28 May 2024.
+		\href{https://lemire.me/blog/2024/02/19/measuring-energy-usage-regular-code-vs-simd-code}{https://lemire.me/blog/2024/02/19/measuring-energy-usage-regular-code-vs-simd-code/}\\
+		Retrieved 28 May 2024.
+		\bibitem{elf-spec}
+		\href{https://refspecs.linuxfoundation.org/elf/elf.pdf}{https://refspecs.linuxfoundation.org/elf/elf.pdf}\\
+		Retrieved 29 May 2024.
+		\bibitem{x86_64-abi-spec}
+		\href{https://refspecs.linuxbase.org/elf/x86_64-abi-0.99.pdf}{https://refspecs.linuxbase.org/elf/x86\_64-abi-0.99.pdf}\\
+		Retrieved 29 May 2024.
 		
 	\end{thebibliography}
 \end{document}
