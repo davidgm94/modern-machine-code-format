@@ -7,7 +7,7 @@
 	columns=flexible
 	breaklines=true
 }
-\title{\vspace{-2.5cm}\textbf{Prototyping a Modern Machine Code File Format For Libraries and Executables}}
+\title{\vspace{-2.5cm}\textbf{Prototyping a Simplified Machine Code File Format For Libraries and Executables}}
 \author{David Gonzalez Martin}
 \date{\vspace{-5ex}}
 
@@ -17,56 +17,67 @@
 	\tableofcontents
 	\newpage
 	\section{Introduction}
-    TODO
+	\paragraph{} Nowadays modern software development has dramatically increased in complexity and both the user and the developer ends experiment problems around it. This work is aimed towards reducing the complexity when directly producing native executable and library binaries.
+	\paragraph{} The development of this thesis is fully open-source, so you can keep track of the progress\cite{self}.\\
 	\subsection{Context and Rationale}
-	\paragraph{}In modern days there is just a ton of complexity in software, both for the developer and the user. World turned to web applications as a way to fill the gap that traditional software failed to master: cross-platform software. Programmers felt the need to forget about memory management and garbage collection started dominating most of common software, especially in the business field. Types were an obstacle to developers, who demanded more and more flexibility, and dynamic typing appeared, leading to the emergence of interpreters and just-in-time compilers.
-	\paragraph{}But this is not only about web and business software development. Systems programming is infected with this virus as well. The enormous complexity inherited from the times when UNIX was born has generated an overwhelming environment for both users and developers. Code is duplicated or triplicated, leaving the developer with the obligation to deal with more software than necessary and users see how binary files tend to multiply in their disk with no direct corelation with any new feature or improvement whatsoever. Modern compilers and operating systems and complex system software in general are about millions of lines of code, when Linux started out very simple, with just about 20 thousand lines of code. If you try to ship a videogame in Linux, it is a nightmare due to GNU libc versioning and proprietary drivers adhering to a version which may or may not match your system's version. Linux provides a stable system call interface but no advantage is taken off this, translating from Microsoft land the so-called term "DLL hell".
+	\paragraph{}In modern days there is significant complexity in software, both for the developer and the user. The paradigm for home computing shifted towards web applications as a way to fill the gap that traditional software failed to occupy: cross-platform software. The trend in the developer sector was to forget about memory management and garbage collection started dominating most of common software, especially in the business field. Types were an obstacle to developers, who demanded more and more flexibility, and dynamic typing appeared, leading to the emergence of interpreters and just-in-time compilers.
+	\paragraph{}Nevertheless, this cannot only be sensed in the web and business software development world. Systems programming is infected with this fashion as well.
+	\paragraph{} The enormous complexity inherited from the times when UNIX was born has generated an overwhelming environment for both users and developers. Code is duplicated or triplicated, leaving the developer with the obligation to deal with more software than necessary and users see how binary files tend to multiply in their disk with no direct corelation with any new feature or improvement whatsoever.
+	\paragraph{} Modern compilers and operating systems and complex system software in general are about millions of lines of code, when Linux started out very simple, with just about 20 thousand lines of code. Now the Linux repository is over 20 millions lines of code.
+	\paragraph{} If you try to ship a videogame in Linux, it is a nightmare due to GNU libc versioning and proprietary drivers adhering to a version which may or may not match your system's version. Linux provides a stable system call interface but no advantage is taken off this, translating from Microsoft land the so-called term "DLL hell".
 	\paragraph{}TODO: provide more ideas. Should this go in introduction?
 	\subsection{Goals}
 	\paragraph{}The general goal of the project is to untangle and reduce the complexity that modern operating systems have between redundant binary components and introduce simple solutions to some of latent problems that the unnecessary separation has been adding.	
 	\paragraph{}Some of the problems I have observed and I plan to tackle in my work are:
 	\begin{itemize}
 		\item Suppress the distinction between dynamic and static libraries with respect to the file format. One file format should comprehend both and both could live in the same binary, giving the chance to the linker to pick the desired linking mode.
-		\item Eliminate the distinction between command line interface (CLI) programs and libraries. Most Linux utilities, like grep or ls, are standalone programs which link libraries to fulfill their purpose. Instead, the proposal is to have a single binary file which can act both as a library and as an executable. \textbf{Does this belong here?} This will be achieved by adding some entry points to the binary in case the binary is being executed from a shell so that the user is able to interact properly with the functionality of the code hosted by the binary.
-		\paragraph{TODO: place this somewhere else:}However, the preferred way to link programs and scale is through using the binary and linking library functions into an executable, not calling out shell programs.
+		\item Eliminate the distinction between command line interface (CLI) programs and libraries. Most Linux utilities, like \verb|grep| or \verb|ls|, are standalone programs which link libraries to fulfill their purpose. Instead, the proposal is to have a single binary file which can act both as a library and as an executable.
+
 		\item Allow the user of the format to have different programs hosted inside a single executable. This would allow good capabilities of customization and, what is more important, the following case:
 		\item Loader custom logic, allowing the user, among other abilities, to produce an in-memory code section fit for the used CPU architecture, features and instructions.
-		\paragraph{} There are a couple of additional ideas which are incredibly temptative to work on, such as implementing a feature system which is both extensible and efficient and implementing linking based on integer ids instead of names, but since the time constraint is not particularly long, they are out of the scope of this project for the time being.
 	\end{itemize}
+	\paragraph{} There are a couple of additional ideas which are incredibly temptative to work on, such as implementing a feature system which is both extensible and efficient and implementing linking based on integer ids instead of names, but since the time constraint is not particularly long, they are out of the scope of this project for the time being.
 	\subsection{Impact on Sustainability and Diversity and Social-Ethical Influence}
-    Developing a new executable and library format will yield enormous gains in disk space, which will translate in files being in the operating system filesystem cache more frequently and thus leading to faster program loading and less CPU cache pollution. All of this will translate to less energy consumed by computers, but not only because of the previous factors mentioned. Correct CPU instruction selection is crucial to save both energy and time, as professor Daniel Lemire states in this blog post: https://lemire.me/blog/2024/02/19/measuring-energy-usage-regular-code-vs-simd-code/
+    \paragraph{} Developing a new executable and library format will yield enormous gains in disk space, which will translate in files being in the operating system filesystem cache more frequently and thus leading to faster program loading and less CPU cache pollution. All of this will translate to less energy consumed by computers, but not only because of the previous factors mentioned. Correct CPU instruction selection is crucial to save both energy and time, as professor Daniel Lemire states \cite{lemire-energy}. 
 	\subsection{Used Method and Approach}
 	\paragraph{}This work will only be addressing the x86\_64 architecture along with the GNU/Linux operating system, for a matter of simplicity and time limitation.
     
-    \paragraph{}One of the first developments to be made will be to write the skeleton of a very basic user-space loader, that is, a program that can load binary files into memory and execute them. This is possible in Linux and modern operating systems by using system calls like \verb|mmap| which allow the user to set some virtual memory chunk as executable. This program will serve as a way to verify the executable is well formed and that the code and relocations are the intended artifacts the programmer originally wanted.
+    \paragraph{}One of the first developments to be made will be to write the skeleton of a very basic user-space loader, that is, a program that can load binary files into memory and execute them.
     
     \paragraph{}At the same time, current executable and library formats will be examined to look for good concepts to integrate into this more modern format and bad practices to be avoided.
     
-    \paragraph{}I have been doing some research on how to make consistent the relocation types between static and dynamic libraries and to me it feels like these are massively overcomplicated and that only using instruction pointer relative addressing (RIP-relative addressing in x86\_64) could work very well for both of them. This makes everything so much more simple, at the cost of not depending on any library which uses GOT, PLT or something similar, like GNU libc. For the same reason, this relative addressing has been chosen to have just 32-bit operands, so that no different types of relocations exist at all and pave the way for an implementation given the time constraint.
+    \paragraph{}Moreover, relocation types will be examined with a critical approach. Part of the complexity had in binary formats which contain native code is the wide range of unnecessary features. The investment in such features is widespread and unfortunately such practice is normalized.
     
-    \paragraph{}At the same time, I opted for doing manual encoding for instructions and data. I could have used an assembler like nasm but to have full control over how the bytes are generated and not to have any headaches regarding something unintentioned the assembler had done for me. While this gains me some control, I lose the ability to have a more worthwhile code to show along the loader/linker. I think that's a fine tradeoff to make, since the meat of the work is to focus on the technology and not having it work with complex or existing code.
-	\subsection{Planning}
-	TODO
-	\subsection{Result Preview}
-	TODO
+    \paragraph{} With respect to the production of the relevant machine code, manual encoding will be used despite the existence of a few production-ready assemblers for x86\_64. 
+    
+    \paragraph{} The reasoning behind of all these decisions will be described in detail in the next sections.
+
+%	\subsection{Planning}
+%	TODO
+%	\subsection{Result Preview}
+%	TODO
+
 	\subsection{Thesis Overview}
-	TODO	
+	The main proposal of this work is to develop a prototype of a machine code format for both libraries and executable, aiming to simplify the current state of affairs. This targets the suppression of duplicities such as executables versus libraries, dynamic versus static linking, different relocation types and merging altogether, object format versus executable/library format, etc.
 	\section{Resources and Approach}
 	TODO
 	\section{Results}
-	TODO
+		\paragraph{}TODO: this is a collection of ideas from previous sections to be developed more seriously and in detail.
+		\paragraph{}I have been doing some research on how to make consistent the relocation types between static and dynamic libraries and to me it feels like these are massively overcomplicated and that only using instruction pointer relative addressing (RIP-relative addressing in x86\_64) could work very well for both of them. This makes everything so much more simple, at the cost of not depending on any library which uses GOT, PLT or something similar, like GNU libc. For the same reason, this relative addressing has been chosen to have just 32-bit operands, so that no different types of relocations exist at all and pave the way for an implementation given the time constraint.
+	\paragraph{TODO: place this somewhere else:}However, the preferred way to link programs and scale is through using the binary and linking library functions into an executable, not calling out shell programs.
+	 \paragraph{Does this belong here?} This will be achieved by adding some entry points to the binary in case the binary is being executed from a shell so that the user is able to interact properly with the functionality of the code hosted by the binary.
+	  \paragraph{}This is possible in Linux and any modern operating system by using system calls like \verb|mmap| which allow the user to mark some allocated virtual memory region as executable. This program will serve as a way to verify the executable is correctly formed and to load the executable in memory without modifying any kernel source code.
+	  \paragraph{}This is due to the malleability that such method provides, giving me full control over the bytes generated, avoiding undesired byte output and making me easier to emit relocations in the middle of such code. While this ensures more control, the ability to have a more worthwhile code to show along the loader/linker program is lost, which I certainly believe is a fine trade-off to make since the interesting bit of this work is the linking and loading technology, not the code which is to be linked or loaded.
 	\section{Conclusion and Future Work}
 	TODO
 	%\section{Glossary}
 	%TODO
 
-%	\begin{thebibliography}{9}
-%		\bibitem{epyc}
-%		AMD Epyc 9654 https://www.amd.com/en/product/12191. Retrieved 24 October 2023.
-%		\bibitem{13900k}
-%		Intel Core i9 13900K https://www.intel.com/content/www/us/en/products/sku/236773/intel-core-i9-processor-14900k-36m-cache-up-to-6-00-ghz/specifications.html Retrieved 24 October 2023.
-%		\bibitem{crucialt700}
-%		Crucial T700 https://www.crucial.com/ssd/t700/CT1000T700SSD5.html Retrieved 24 October 2023.
-%	\end{thebibliography}
-%	TODO
+	\begin{thebibliography}{9}
+		\bibitem{self}
+		Repository for this thesis:\\ \href{https://github.com/davidgm94/modern-machine-code-format/}{https://github.com/davidgm94/modern-machine-code-format/}\\Retrieved 28 May 2024.
+		\bibitem{lemire-energy}
+		\href{https://lemire.me/blog/2024/02/19/measuring-energy-usage-regular-code-vs-simd-code}{https://lemire.me/blog/2024/02/19/measuring-energy-usage-regular-code-vs-simd-code/}\\Retrieved 28 May 2024.
+		
+	\end{thebibliography}
 \end{document}
