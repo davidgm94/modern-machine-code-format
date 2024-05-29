@@ -1,24 +1,24 @@
 \documentclass[12pt]{article}
 \usepackage{hyperref}
-\usepackage[margin=2.0cm]{geometry}
+%\usepackage[margin=2.0cm]{geometry}
 \usepackage{listings}
 \lstset{
 	basicstyle=\small\ttfamily,
 	columns=flexible
 	breaklines=true
 }
-\title{\vspace{-2.5cm}\textbf{Prototyping a Simplified Machine Code File Format For Libraries and Executables}}
-\author{\textbf{Author}\\David Gonzalez Martin\\\textbf{Thesis advisor}\\Belen Bermejo Gonzalez\\\textbf{Coordinating professor}\\Josep Jorba Esteve}
-\date{\vspace{-5ex}}
+\title{\textbf{Prototyping a Simplified Machine Code File Format For Libraries and Executables}}
+\author{\textbf{Author}\\David Gonzalez Martin\\\\\textbf{Thesis advisor}\\Belen Bermejo Gonzalez\\\\\textbf{Coordinating professor}\\Josep Jorba Esteve\\\\\textbf{University}\\Universitat Oberta de Catalunya}
+\date{June 2024}
 
 \begin{document}
-	\maketitle{\vspace{-1.5cm}}
+	\maketitle{}
 	\newpage
 	\tableofcontents
 	\newpage
 	\section{Introduction}
 	\paragraph{} Nowadays modern software development has dramatically increased in complexity and both the user and the developer ends experiment problems around it. This work is aimed towards reducing the complexity when directly producing native executable and library binaries.
-	\paragraph{} The development of this thesis is fully open-source, so you can keep track of the progress\cite{self}.
+	\paragraph{} The development of this thesis is fully open-source, so the progress can be tracked\cite{self}.
 	\subsection{Context and Rationale}
 	\paragraph{}In modern days there is significant complexity in software, both for the developer and the user. The paradigm for home computing shifted towards web applications as a way to fill the gap that traditional software failed to occupy: cross-platform software. The trend in the developer sector was to forget about memory management and garbage collection started dominating most of common software, especially in the business field. Types were an obstacle to developers, who demanded more and more flexibility, and dynamic typing appeared, leading to the emergence of interpreters and just-in-time compilers.
 	\paragraph{}Nevertheless, this cannot only be sensed in the web and business software development world. Systems programming is infected with this fashion as well.
