@@ -18,7 +18,7 @@
 	\newpage
 	\section{Introduction}
 	\paragraph{}Nowadays modern software development has dramatically increased in complexity and both the user and the developer ends experiment problems around it. This work is aimed towards reducing the complexity when directly producing native executable and library binaries.
-	\paragraph{}The development of this thesis is fully open-source, so the progress can be tracked\cite{self}.
+	\paragraph{}The development of this thesis is fully open-source, so the source code for both this memory and the linker/loader program can be consulted\cite{self}.
 	\subsection{Context and Rationale}
 	\paragraph{}In modern days there is significant complexity in software, both for the developer and the user. The paradigm for home computing shifted towards web applications as a way to fill the gap that traditional software failed to occupy: cross-platform software. The trend in the developer sector was to forget about memory management and garbage collection started dominating most of common software, especially in the business field. Types were an obstacle to developers, who demanded more and more flexibility, and dynamic typing appeared, leading to the emergence of interpreters and just-in-time compilers.
 	\paragraph{}Nevertheless, this cannot only be sensed in the web and business software development world. Systems programming is infected with this fashion as well.
@@ -34,8 +34,14 @@
 		\item Allow the user of the format to have different programs hosted inside a single executable. This would allow good capabilities of customization and, what is more important, the following case:
 		\item Loader custom logic, allowing the user, among other abilities, to produce an in-memory code section fit for the used CPU architecture, features and instructions.
 	\end{itemize}
-	\paragraph{} There is a couple of additional ideas which are incredibly temptative to work on, such as implementing a feature system which is both extensible and efficient and implementing linking based on integer ids instead of names, but since the time constraint is not particularly long, they are out of the scope of this project for the time being.
-	\paragraph{}Not to mention the topic of security, which is crucial in modern software and hardware. However, this is out of scope of the project for the time being.
+	\paragraph{}There are a few ideas which are incredibly temptative to work on, but due to the scope of the project must be unfortunately left aside. Some of the most relevant ones are:
+	\begin{itemize}
+		\item Implementing a feature system which is both extensible and efficient.
+		\item Implementing linking based on integer identification numbers instead of strings or names.
+		\item Taking into account security when designing the format. It is a crucial aspect both in modern software and hardware, but again for time reasons must be left aside for the moment.
+		\item A good algorithm or implementation to merge sections. Instead, an idea of units or packs will be used.
+	\end{itemize}
+
 	\subsection{Impact on Sustainability and Diversity and Social-Ethical Influence}
     \paragraph{} Developing a new executable and library format will yield enormous gains in disk space, which will translate in files being in the operating system filesystem cache more frequently and thus leading to faster program loading and less CPU cache pollution. All of this will translate to less energy consumed by computers, but not only because of the previous factors mentioned. Correct CPU instruction selection is crucial to save both energy and time, as professor Daniel Lemire states \cite{lemire-energy}. 
 	\subsection{Used Method and Approach}
