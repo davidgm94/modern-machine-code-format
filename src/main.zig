@@ -2,12 +2,6 @@ const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 
-// Layout of the format:
-// HEADER
-// EXTERNAL SYMBOL TABLE
-// library: u32
-// symbol: u32
-
 const Header = extern struct{
     magic: [3]u8 = "NAT".*,
     arch: Arch,
@@ -45,7 +39,6 @@ const Header = extern struct{
     };
 };
 
-
 const SectionSymbolOffsetHeader = extern struct{
     // This offset marks the start of the symbols that a section has
     // with respect to the symbol table section
@@ -59,7 +52,7 @@ const Section = extern struct{
     description: Description,
     reserved: [3]u8 = .{0} ** 3,
 
-    pub const Description = packed struct(u8){
+    pub const Description = packed struct(u8) {
         type: Section.Type,
         // This does not mean the section cannot be read by the CPU,
         // but if it should be loaded into memory when a piece of code
@@ -99,16 +92,12 @@ fn mmap(address: ?[*]align(std.mem.page_size) u8, size: usize, permissions: stru
 }
 
 const mov_rsp_rdi = [_]u8{0x48, 0x89, 0xfc};
-
-const xor_eax_eax = [_]u8{0x31, 0xc0};
 const ret = [1]u8{0xc3};
-
-const ret0 = xor_eax_eax ++ ret;
-const ret0_function_type = fn () callconv(.C) i32;
 
 fn call(operand: i32) [5]u8{
     return [_]u8{ 0xe8 } ++ @as([4]u8, @bitCast(operand));
 }
+
 fn mov_eax_imm32(imm32: u32) [5]u8 {
     return [1]u8{0xb8} ++ @as(*const [4]u8, @ptrCast(&imm32)).*;
 }
@@ -121,34 +110,12 @@ fn mov_rip_mem_eax(operand: i32) [6]u8{
     return .{0x89, 0x5} ++ @as([4]u8, @bitCast(operand));
 }
 
-fn sub_eax_imm8(imm8: u8) [3]u8{
-    return [_]u8{0x83, 0xe8, imm8};
-}
-
-const number = 5;
-const mov_eax_edi = [_]u8{0x89, 0xf8};
-const mov_edi_eax = [_]u8{0x89, 0xc7};
 const syscall = [_]u8{0x0f, 0x05};
 const xor_edi_edi = [_]u8{0x31, 0xff};
-const inc_edi = [_]u8{0xff, 0xc7};
-const exit = mov_eax_imm32(231) ++ syscall;
-const call_relocatable = call(0);
 
 fn lea_rsi_rip_mem(offset: i32) [7]u8{
     return .{0x48, 0x8d, 0x35} ++ @as([4]u8, @bitCast(offset));
 }
-
-/////////////////
-
-const program =
-    mov_rsp_rdi ++
-    call_relocatable ++
-    sub_eax_imm8(number) ++
-    mov_edi_eax ++
-    exit;
-
-////////////////
-
 
 const Relocation = extern struct{
     destination: Destination,
@@ -208,19 +175,19 @@ fn add_eax_imm8(imm8: u8) [3]u8 {
 
 // These two are assumed to be concatenated so RIP-relative addressing works
 const main_print_library_code = 
-    // -11 -> 5 call instruction + 3 mov rsp, rdi + 1 ret + 5 call instruction
     // Set up the stack
     mov_rsp_rdi ++
-    // Call the function to get the number
+    // Call the function to get the number (this contains an unresolved relocation)
     call(0) ++
+    // Format the decimal digit as an ASCII character (this number is inside a 32-bit register)
     add_eax_imm8('0') ++
-    // Mov the 32-bit into the data section so that it can be printed
+    // Mov the 32-bit into the data section so that it can be printed (this contains an unresolved relocation)
     mov_rip_mem_eax(0) ++ 
     // 1 - write syscall id
     mov_eax_imm32(1) ++
     // 1 - file descriptor: stdout
     mov_edi_imm32(1) ++
-    // Move that character buffer pointer as first argument
+    // Move that character buffer pointer as first argument (this contains an unresolved relocation)
     lea_rsi_rip_mem(0) ++ 
     // 1 - stdout file descriptor
     mov_edx_imm32(1) ++
@@ -231,7 +198,8 @@ const main_print_library_code =
     mov_eax_imm32(231) ++
     syscall;
 
-const library_code_function = mov_eax_imm32(number) ++ ret;
+const library_code_function = mov_eax_imm32(5) ++ ret;
+
 const main_print_library_code_relocations = [_]Relocation{
     .{
         .destination = .{
@@ -301,7 +269,6 @@ const WriteBinaryOptions = struct {
     external_relocations: []const Relocation,
     entry_point: Symbol.Reference,
     kind: Header.Kind,
-    linkage: Header.Linkage,
 
     const SectionData = struct {
         symbols: []const SymbolData,
@@ -324,15 +291,15 @@ fn write_binary(allocator: Allocator, options: WriteBinaryOptions) !void {
     if (options.sections.len == 0) {
         @panic("Executable must contain at least one section");
     }
-    const relocations_resolved = options.linkage == .static or options.libraries.len == 0;
+    const relocations_resolved = options.libraries.len == 0;
     const buffer = try mmap(null, 0x1000, .{ .writable = true, .executable = false });
     var array_list = FileWriter.initBuffer(@alignCast(buffer));
     const header = add_struct(&array_list, Header);
     const section_headers = add_structs(&array_list, Section,
         options.sections.len +
         1 + // internal (symbol) table 
-        @intFromBool(options.linkage == .dynamic and options.libraries.len > 0) + // external (symbol) table
-        @intFromBool(options.linkage == .dynamic and options.libraries.len > 0) + // relocation table
+        @intFromBool(options.libraries.len > 0) + // external (symbol) table
+        @intFromBool(options.libraries.len > 0) + // relocation table
         1 + // general symbol table
         1 // string table
     );
@@ -388,82 +355,77 @@ fn write_binary(allocator: Allocator, options: WriteBinaryOptions) !void {
     section_index += 1;
     array_list.appendSliceAssumeCapacity(section_symbol_table_bytes);
 
-    switch (options.linkage) {
-        .dynamic => {
-            var libraries = std.ArrayListUnmanaged(Library){};
+    var libraries = std.ArrayListUnmanaged(Library){};
 
-            if (options.libraries.len > 0) {
-                array_list.items.len = std.mem.alignForward(usize, array_list.items.len, 4);
-                assert(options.external_relocations.len > 0);
+    if (options.libraries.len > 0) {
+        array_list.items.len = std.mem.alignForward(usize, array_list.items.len, 4);
+        assert(options.external_relocations.len > 0);
 
 
-                for (options.libraries, 0..) |library, library_i| {
-                    const lib = Library{
-                        .name = .{
-                            .offset = @intCast(string_table.items.len),
-                            .length = @intCast(library.name.len),
-                        },
-                        .symbol_offset = @intCast(symbol_table_symbols.items.len),
-                        .symbol_count = @intCast(library.symbols.len),
-                    };
-                    try libraries.append(allocator, lib);
+        for (options.libraries, 0..) |library, library_i| {
+            const lib = Library{
+                .name = .{
+                    .offset = @intCast(string_table.items.len),
+                    .length = @intCast(library.name.len),
+                },
+                .symbol_offset = @intCast(symbol_table_symbols.items.len),
+                .symbol_count = @intCast(library.symbols.len),
+            };
+            try libraries.append(allocator, lib);
 
-                    try string_table.appendSlice(allocator, library.name);
+            try string_table.appendSlice(allocator, library.name);
 
-                    for (library.symbols) |symbol| {
-                        std.debug.print("(relocation) {s} symbol (library {}, symbol {}): {s}\n", .{options.path, library_i, symbol_table_symbols.items.len, symbol});
-                        try symbol_table_symbols.append(allocator, .{
-                            // Unused field
-                            .section = 0,
-                            .reference_to_parent = @intCast(library_i),
-                            .name = .{
-                                .offset = @intCast(string_table.items.len),
-                                .length = @intCast(symbol.len),
-                            },
-                        });
-                        try string_table.appendSlice(allocator, symbol);
-                    }
-                }
-
-                const library_bytes = std.mem.sliceAsBytes(libraries.items);
-
-                section_headers[section_index] = .{
-                    .unit_offset = @intCast(array_list.items.len),
-                    .unit_size = @intCast(library_bytes.len),
-                    .description = .{
-                        .type = .external_table,
-                        .read = false,
-                        .write = false,
-                        .execute = false,
+            for (library.symbols) |symbol| {
+                std.debug.print("(relocation) {s} symbol (library {}, symbol {}): {s}\n", .{options.path, library_i, symbol_table_symbols.items.len, symbol});
+                try symbol_table_symbols.append(allocator, .{
+                    // Unused field
+                    .section = 0,
+                    .reference_to_parent = @intCast(library_i),
+                    .name = .{
+                        .offset = @intCast(string_table.items.len),
+                        .length = @intCast(symbol.len),
                     },
-                };
-                section_index += 1;
-
-                array_list.appendSliceAssumeCapacity(library_bytes);
+                    });
+                try string_table.appendSlice(allocator, symbol);
             }
+        }
 
-            if (options.external_relocations.len > 0) {
-                array_list.items.len = std.mem.alignForward(usize, array_list.items.len, 4);
-                assert(options.libraries.len > 0);
+        const library_bytes = std.mem.sliceAsBytes(libraries.items);
 
-                const external_relocation_bytes = std.mem.sliceAsBytes(options.external_relocations);
+        section_headers[section_index] = .{
+            .unit_offset = @intCast(array_list.items.len),
+            .unit_size = @intCast(library_bytes.len),
+            .description = .{
+                .type = .external_table,
+                .read = false,
+                .write = false,
+                .execute = false,
+            },
+        };
+        section_index += 1;
 
-                section_headers[section_index] = .{
-                    .unit_offset = @intCast(array_list.items.len),
-                    .unit_size = @intCast(external_relocation_bytes.len),
-                    .description = .{
-                        .type = .relocations,
-                        .read = false,
-                        .write = false,
-                        .execute = false,
-                    },
-                };
-                section_index += 1;
+        array_list.appendSliceAssumeCapacity(library_bytes);
+    }
 
-                array_list.appendSliceAssumeCapacity(external_relocation_bytes);
-            }
-        },
-        .static => unreachable,
+    if (options.external_relocations.len > 0) {
+        array_list.items.len = std.mem.alignForward(usize, array_list.items.len, 4);
+        assert(options.libraries.len > 0);
+
+        const external_relocation_bytes = std.mem.sliceAsBytes(options.external_relocations);
+
+        section_headers[section_index] = .{
+            .unit_offset = @intCast(array_list.items.len),
+            .unit_size = @intCast(external_relocation_bytes.len),
+            .description = .{
+                .type = .relocations,
+                .read = false,
+                .write = false,
+                .execute = false,
+            },
+        };
+        section_index += 1;
+
+        array_list.appendSliceAssumeCapacity(external_relocation_bytes);
     }
 
     array_list.items.len = std.mem.alignForward(usize, array_list.items.len, 4);
@@ -546,7 +508,7 @@ fn write_binary(allocator: Allocator, options: WriteBinaryOptions) !void {
     });
 }
 
-fn link(allocator: Allocator, options: struct {
+fn link(options: struct {
     file_path: []const u8,
     linkage: Header.Linkage,
     output: ?[]const u8 = null,
@@ -598,23 +560,23 @@ fn link(allocator: Allocator, options: struct {
     }
 
     if (has_relocations != has_external_table) {
-        @panic("Relocations must match an external table");
+        @panic("Relocation section must match an external table section");
     }
 
     if (has_relocations) {
-        const section_headers = try allocator.dupe(Section, original_section_headers);
+        const section_headers = original_section_headers;
         var libraries_loaded = std.BoundedArray([]const u8, 32){};
         var libraries_bytes = std.BoundedArray([]const u8, 32){};
 
         const internal_count = @divExact(internal_table_section_header.unit_size, @sizeOf(SectionSymbolOffsetHeader));
-        const internal_table = try allocator.dupe(SectionSymbolOffsetHeader, @as([*]SectionSymbolOffsetHeader, @alignCast(@ptrCast(&file_buffer.items[internal_table_section_header.unit_offset])))[0..internal_count]);
+        const internal_table = @as([*]SectionSymbolOffsetHeader, @alignCast(@ptrCast(&file_buffer.items[internal_table_section_header.unit_offset])))[0..internal_count];
         const library_count = @divExact(external_table_section_header.unit_size, @sizeOf(Library));
-        const libraries = try allocator.dupe(Library, @as([*]Library, @alignCast(@ptrCast(&file_buffer.items[external_table_section_header.unit_offset])))[0..library_count]);
+        const libraries = @as([*]Library, @alignCast(@ptrCast(&file_buffer.items[external_table_section_header.unit_offset])))[0..library_count];
         const relocation_count = @divExact(relocation_section_header.unit_size, @sizeOf(Relocation));
-        const relocations = try allocator.dupe(Relocation, @as([*]Relocation, @alignCast(@ptrCast(&file_buffer.items[relocation_section_header.unit_offset])))[0..relocation_count]);
+        const relocations = @as([*]Relocation, @alignCast(@ptrCast(&file_buffer.items[relocation_section_header.unit_offset])))[0..relocation_count];
         const symbol_count = @divExact(symbol_table_section_header.unit_size, @sizeOf(Symbol.Information));
-        const symbol_table = try allocator.dupe(Symbol.Information, @as([*]Symbol.Information, @alignCast(@ptrCast(&file_buffer.items[symbol_table_section_header.unit_offset])))[0..symbol_count]);
-        const string_table = try allocator.dupe(u8, file_buffer.items[string_table_section_header.unit_offset..][0..string_table_section_header.unit_size]);
+        const symbol_table = @as([*]Symbol.Information, @alignCast(@ptrCast(&file_buffer.items[symbol_table_section_header.unit_offset])))[0..symbol_count];
+        const string_table = file_buffer.items[string_table_section_header.unit_offset..][0..string_table_section_header.unit_size];
 
         for (relocations) |relocation| {
             const destination_library_index = relocation.destination.reference_to_parent;
@@ -708,14 +670,14 @@ fn load_from_file(file_path: []const u8) !noreturn {
     const bytes = try mmap(null, 0x1000, .{ .writable = true, .executable = true });
     _ = try file_descriptor.readAll(bytes);
     const stack = try mmap(null, 0x1000, .{ .writable = true, .executable = false });
-    const header = @as(*Header, @alignCast(@ptrCast(bytes.ptr))).*;
+    const header = @as(*const Header, @alignCast(@ptrCast(bytes.ptr))).*;
     const entry_point: *const fn (stack_top: u64) callconv(.C) noreturn = @ptrCast(bytes.ptr + header.entry_point);
     entry_point(@intFromPtr(stack.ptr + stack.len));
 }
 
 fn load_from_memory(bytes: []const u8) !noreturn {
     const stack = try mmap(null, 0x1000, .{ .writable = true, .executable = false });
-    const header = @as(*Header, @alignCast(@ptrCast(bytes.ptr))).*;
+    const header = @as(*const Header, @alignCast(@ptrCast(bytes.ptr))).*;
     const entry_point: *const fn (stack_top: u64) callconv(.C) noreturn = @ptrCast(bytes.ptr + header.entry_point);
     entry_point(@intFromPtr(stack.ptr + stack.len));
 }
@@ -729,7 +691,6 @@ pub fn main() !void {
     try write_binary(allocator, .{
         .path = library_file_path,
         .kind = .executable,
-        .linkage = .dynamic,
         .sections = &.{
             .{ 
                 .symbols = &.{
@@ -773,87 +734,100 @@ pub fn main() !void {
         },
     });
 
-    const executable_file_path = "executable.nat";
-    try write_binary(allocator, .{
-        .path = executable_file_path,
-        .sections = &.{
-            .{
-                .symbols = &.{
+    const execution_type = Header.Kind.executable;
+    switch (execution_type) {
+        .executable => {
+            const executable_file_path = "executable.nat";
+            try write_binary(allocator, .{
+                .path = executable_file_path,
+                .sections = &.{
                     .{
-                        .bytes = &main_print_library_code,
-                        .name = "_start",
+                        .symbols = &.{
+                            .{
+                                .bytes = &main_print_library_code,
+                                .name = "_start",
+                            },
+                            },
+                        .description = .{
+                            .type = .code,
+                            .read = true,
+                            .write = false,
+                            .execute = true,
+                        },
+                        },
+                    .{ 
+                        .symbols = &.{
+                            .{
+                                .bytes = &.{0},
+                                .name = "buffer",
+                            },
+                            },
+                        .description = .{
+                            .type = .data,
+                            .read = true,
+                            .write = true,
+                            .execute = false,
+                        },
+                        },
                     },
-                },
-                .description = .{
-                    .type = .code,
-                    .read = true,
-                    .write = false,
-                    .execute = true,
-                },
-            },
-            .{ 
-                .symbols = &.{
+                    // Avoid the first internal relocation since it's relocating the call and we want to relocate to a library symbol
+                .internal_relocations = main_print_library_code_relocations[1..],
+                .libraries = &.{
                     .{
-                        .bytes = &.{0},
-                        .name = "buffer",
+                        .name = library_file_path,
+                        .symbols = &.{
+                            library_function_name,
+                        },
+                        },
                     },
-                },
-                .description = .{
-                    .type = .data,
-                    .read = true,
-                    .write = true,
-                    .execute = false,
-                },
-            },
-        },
-        // Avoid the first internal relocation since it's relocating the call and we want to relocate to a library symbol
-        .internal_relocations = main_print_library_code_relocations[1..],
-        .libraries = &.{
-            .{
-                .name = library_file_path,
-                .symbols = &.{
-                    library_function_name,
-                },
-            },
-        },
-        .external_relocations = &.{
-            .{
-                .destination = .{
-                    .symbol = 0,
-                    // This is the library index
-                    .reference_to_parent = 0,
-                },
-                .source = .{
-                    .reference = .{
-                        .symbol = 0,
-                        .reference_to_parent = 0,
-                    },
-                    .offset_from_symbol = mov_rsp_rdi.len,
-                    .write_offset = 1,
-                    .relative_offset = 5,
-                },
-            },
-        },
-        .entry_point = .{
-            .symbol = 0,
-            .reference_to_parent = 0,
-        },
-        .kind = .executable,
-        .linkage = .dynamic,
-    });
+                    .external_relocations = &.{
+                        .{
+                            .destination = .{
+                                .symbol = 0,
+                                // This is the library index
+                                .reference_to_parent = 0,
+                            },
+                            .source = .{
+                                .reference = .{
+                                    .symbol = 0,
+                                    .reference_to_parent = 0,
+                                },
+                                .offset_from_symbol = mov_rsp_rdi.len,
+                                .write_offset = 1,
+                                .relative_offset = 5,
+                            },
+                            },
+                        },
+                        .entry_point = .{
+                            .symbol = 0,
+                            .reference_to_parent = 0,
+                        },
+                        .kind = .executable,
+            });
 
-    const dynamic = try link(allocator, .{
-        .file_path = executable_file_path,
-        .linkage = .dynamic,
-    });
-    _ = dynamic; // autofix
+            const linkage = Header.Linkage.static;
 
-    const static_file_path = "static.nat";
-    const static = try link(allocator, .{
-        .file_path = executable_file_path,
-        .linkage = .static,
-        .output = static_file_path,
-    });
-    _ = static; // autofix
-    try load_from_file(static_file_path);
+            switch (linkage) {
+                .dynamic => {
+                    const dynamic = try link(.{
+                        .file_path = executable_file_path,
+                        .linkage = .dynamic,
+                    });
+                    try load_from_memory(dynamic);
+                },
+                .static => {
+                    const static = try link(.{
+                        .file_path = executable_file_path,
+                        .linkage = .static,
+                        .output = "static.nat",
+                    });
+                    // Directly load from memory instead of fetching the file from disk.
+                    try load_from_memory(static);
+                },
+            }
+        },
+        .library => {
+            try load_from_file(library_file_path);
+        },
+    }
 }

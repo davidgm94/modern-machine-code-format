@@ -1,5 +1,6 @@
 \documentclass[12pt]{article}
 \usepackage{hyperref}
+\usepackage[nottoc,numbib]{tocbibind}
 \usepackage[utf8]{inputenc}
 \usepackage{listings}
 \lstset{
@@ -24,7 +25,7 @@
 	\paragraph{}Nevertheless, this cannot only be sensed in the web and business software development world. Systems programming is infected with this fashion as well.
 	\paragraph{} The enormous complexity inherited from the times when UNIX was born has generated an overwhelming environment for both users and developers. Code is duplicated or triplicated, leaving the developer with the obligation to deal with more software than necessary and users see how binary files tend to multiply in their disk with no direct corelation with any new feature or improvement whatsoever.
 	\paragraph{}Modern compilers and operating systems and complex system software in general are about millions of lines of code, when Linux started out very simple, with just about 20 thousand lines of code. Now the Linux repository is over 20 millions lines of code. Veteran developers like Casey Muratori have criticized the complexity derived of the exponentially increasing lines of code of critical projects\cite{thirty-million}.
-	\paragraph{}On Linux there are several problems when targetting graphics applications because you cannot link statically since proprietary drivers ship with a specific version of glibc. Provided that your system might not provide certain versions of glibc, an executable might not run if the version of glibc that was linked with is not located. Linux provides a stable system call interface but this benefit is lost when linking with glibc, which is common practice, translating from Microsoft land the so-called term "DLL hell".
+	\paragraph{}Another taste of complexity in modern software development: on Linux there are several problems when targetting graphics applications because you cannot link statically since proprietary drivers ship with a specific version of glibc. Provided that your system might not provide certain versions of glibc, an executable might not run if the version of glibc that was linked with is not located. Linux provides a stable system call interface but this benefit is lost when linking with glibc, which is common practice, translating from Microsoft land the so-called term "DLL hell".
 	\subsection{Goals}
 	\paragraph{}The general goal of the project is to untangle and reduce the complexity that modern operating systems have between redundant binary components and introduce simple solutions to some of latent problems that the unnecessary separation has been adding.	
 	\paragraph{}Some of the problems that I have observed and that I would like to tackle in my work are:
@@ -45,7 +46,7 @@
 	\subsection{Impact on Sustainability and Diversity and Social-Ethical Influence}
     \paragraph{} Developing a new executable and library format will yield enormous gains in disk space, which will translate in files being in the operating system filesystem cache more frequently and thus leading to faster program loading and less CPU cache pollution. All of this will translate to less energy consumed by computers, but not only because of the previous factors mentioned. Correct CPU instruction selection is crucial to save both energy and time, as professor Daniel Lemire states \cite{lemire-energy}. 
 	\subsection{Used Method and Approach}
-	\paragraph{}This work will only be addressing the x86\_64 architecture along with the GNU/Linux operating system, for a matter of simplicity and time limitation. For the same reason, no existing libraries will be used.
+	\paragraph{}This work will only be addressing the x86\_64 architecture along with the GNU/Linux operating system, for a matter of simplicity and time limitation. For the same reason, no existing libraries will be used. The source will be written in Zig\cite{zig}, a new systems programming language. The version of Zig used will be the nightly or master release, which can be downloaded from here\cite{zig-download}. For a pinned release version, \verb|0.13.0-dev.351+64ef45eb0| successfully builds and runs the project.
     
     \paragraph{}The skeleton of the project will be a program which works both as a linker and as a loader, it being able to generate binaries, load them from disk and resolve relocations, as well as setting them up for execution.
     
@@ -65,6 +66,7 @@
 	\subsection{Thesis Overview}
 	The main proposal of this work is to develop a prototype of a machine code format for both libraries and executable, aiming to simplify the current state of affairs. This targets the suppression of duplicities such as executables versus libraries, dynamic versus static linking, different relocation types and merging altogether, object format versus executable/library format, etc.
 	
+	\newpage
 	\section{Resources and Approach}
 	
 	\paragraph{}Since the target of this work is the x86\_64 architecture and the GNU/Linux operating system, the research on the state of affairs is going to be as well on the formats used by this platform, that is, the ELF specification and the System V ABI (for x86\_64).
@@ -151,43 +153,210 @@
 	\paragraph{}This triple indirection poses an obvious penalty and thus dynamic linking with lazy bindings features meaningful overhead in both speed and size.
 	
 	\subsection{Simplification of executable formats}
+	\paragraph{}In previous subsection, a concise explanation was provided regarding the complexity of ELF. The aim of the current subsection will be to provide a faithful comparison between the existing format and one aligned with the goals outlined in this study.
+	\paragraph{}Most of the problems drafted before will be addressed and proposals which match the study goals will be made.
+	
 	\subsubsection{Executables and libraries}
 	
-	\paragraph{Does this belong here?} This will be achieved by adding some entry points to the binary in case the binary is being executed from a shell so that the user is able to interact properly with the functionality of the code hosted by the binary.
+	\paragraph{}The separation between executable and libraries is irreconciliable in the ELF format. Any library, which has already passed the linker stage, cannot offer an arbitrary execution of code.
+	\paragraph{}The main purpose to offer a library to execute an arbitrary piece of code is to offer the user some functionality related to what the library provides when linked. Thus the user could receive some functionality directly from the library, and not needing any third-party executable with the library linked.
+	\paragraph{}This is common in all major operating systems. Since the target of this work is the Linux operating system, an instance of this issue is the melting pot of command line programs offered in their distributions, such as \verb|coreutils|. 
+	\paragraph{}A library with some related functionality which could be accessed through an entry point would avoid this needless complexity, putting together grains of sand with similarities.
+	\paragraph{}This would report some disk space savings (since there is no need for separate files) and better load times (there is a trend in the Linux userspace to dynamically link these executables in order to save some space).
+	\paragraph{}Such modification requires some deep changes in the whole linking/loading structure, since the kernel would need to recognize library entry points in order for all users to enjoy this feature without any added complexity.  So aside from a format change, this would also require patching the binary loader in the kernel and probably the dynamic linker as well.
 	
-	\paragraph{TODO: place this somewhere else:}However, the preferred way to link programs and scale is through using the binary and linking library functions into an executable, not calling out shell programs.
+	\subsubsection{A hate letter to shell scripts for composability}
 	
-	\paragraph{TODO. Move this paragraph below? Detail better}It can be thought that this binary format supports a few use cases that were listed on the goals of this thesis, but in practice the diversification makes them to be far from close to each other. This is even more palpable when exemplified with existing libraries such the GNU libc. More detail on this will be given below.
+	\paragraph{}In the previous section some thoughts were expressed regarding substituting command-line executables with libraries with user-facing functionality (mainly oriented towards satisfying shell users, but not only them).
+	\paragraph{}However, the preferred method to join functionalities in an operating system should be via the linker, that is, linking binary code and data together to perform one or more functionalities. Both dynamic and static libraries report noticeable gains in terms of speed and size over the UNIX manner of commanding the computer to execute one binary after another through scripting.
+	\paragraph{}In a way, shell scripting is little more than a contenation of executable runs which communicate together through text ---\verb|stdin|, \verb|stdout|, \verb|stderr| and the corresponding pipes--- with a few added conveniences).
+	\paragraph{}To expand the idea, the so-called \textit{convenient} composability of shell scripting turns against developers in a reasonably sized project for two main reasons:
 	
-	\subsubsection{Dynamic and static libraries}
+	\begin{itemize}
+		\item Lack of static typing and checking, which helps catching errors before even the first execution is made and it ensures the intention of the author was genuine. The absence of it could hide bugs in unexplored code paths which might trigger in production environments.
+		\item Slowness, due to:
+		\begin{itemize}
+			\item A considerable amount of separate ELF objects need to be loaded into memory to make up a collection of programs which achieves a \textit{single} program's functionality. This triggers filesystem cache misses and puts onto the computer an unnecessary burden for the sake of the human convenience, which at the end of the day might not be entirely true.
+			\item The communication protocol between these pieces of a program (since a shell script is actually a glorified program) is text, which is known to be far from efficient. Computers understand about numbers and bytes and not human characters.
+		\end{itemize}
+	\end{itemize}
 	
-	\paragraph{}TODO
+	\subsubsection{Help the fastest also be flexible: overcoming the false dicotomy of static and dynamic libraries before linking}
+	\paragraph{}Once the idea for composability is clear enough, there are multiple of aspects of ELF that do not comply with this project goals. One of them is related to linking mode preceding linking when it comes to libraries.
+	\paragraph{}Currently, ELF does not admit to choose the mode a library is linked with once it is produced. If someone wants to link dynamically some library, it must be compiled with that in mind. On the contrary, if the choice is static linking,  the same behavior must follow.
+	\paragraph{}However, it is not written in stone that one should pick the linking mode before producing the desired binary file.
+	\paragraph{}One of this project goals is to uniform the binary format, not only libraries with executables, but libraries with themselves. A dynamic library file should have the same bytes in disk that a static version of it. Accordingly, the linking choice can be postponed until linking time (which, when read, makes total sense).
 	
-	\subsubsection{Relocation types}
-	
-	\paragraph{}I have been doing some research on how to make consistent the relocation types between static and dynamic libraries and to me it feels like these are massively overcomplicated and that only using instruction pointer relative addressing (RIP-relative addressing in x86\_64) could work very well for both of them. This makes everything so much more simple, at the cost of not depending on any library which uses GOT, PLT or something similar, like GNU libc. For the same reason, this relative addressing has been chosen to have just 32-bit operands, so that no different types of relocations exist at all and pave the way for an implementation given the time constraint.
-	
-	\subsection{Loader implementation}
-	
-	\paragraph{}This is possible in Linux and any modern operating system by using system calls like \verb|mmap| which allow the user to mark some allocated virtual memory region as executable. This program will serve as a way to verify the executable is correctly formed and to load the executable in memory without modifying any kernel source code.
-	
-	\subsection{Linker implementation}
-	
-	\paragraph{} TODO
-	
+	\subsubsection{Rescuing dynamic linking from the complexity mud}
+	\paragraph{} As stated in the ELF overview, the complexity, though generalized, primarily manisfests within dynamic linking.
+	\paragraph{}The existence of sections such as the GOT and PLT, together with lazy bindings, suffocates this linking mode by making it slower and more bloated, when it was precisely originated with the opposite purpose in mind.
+	\paragraph{}Furthermore, the traditional separation between static and dynamic libraries was frequently manifested with different relocation types, making the artificial gap between them larger.
+	\paragraph{}Dynamic libraries tend to make more use of the compiler PIE/PIC code generation option, while static libraries tend to honor its qualifier.
+	\paragraph{}However, there is no reason to think that they cannot share the relocation type. In fact, the same way the dynamic linker patches GOT entries, it can directly patch the symbol address in all the references to it. This way, a relocation relative to the instruction pointer can be used for both linking modes. In x86\_64, there are multiple relocation sizes of this kind, so the 32-bit one will be used for the sake of simplicity. 32-bit should be enough, given that most code/data will be in a 4 GB range.
+	\paragraph{}The benefit of uniforming the relocation type and eliminating GOT, PLT and lazy bindings is that dynamic code no longer have triple indirection but performs about the same than static code. This, however, comes at the cost that no lazy symbol loading can be done and patches are needed on a per symbol reference basis, not on a per symbol existence one as before.
+	\paragraph{}However, these disadvantages are not that important when they are measured in the eyes of this work's guidelines: bloated libraries are discouraged and they are the main beneficiaries for lazy bindings. At the same time, since modern CPUs are up for batches and bandwidth, patching the same symbol relocations repeated times across the binary must not pose a serious problem.
+
 	\subsection{Machine code generation}
 	
-	\paragraph{}This is due to the malleability that such method provides, giving me full control over the bytes generated, avoiding undesired byte output and making me easier to emit relocations in the middle of such code. While this ensures more control, the ability to have a more worthwhile code to show along the loader/linker program is lost, which I certainly believe is a fine trade-off to make since the interesting bit of this work is the linking and loading technology, not the code which is to be linked or loaded.
+	\paragraph{}There are multiple manners to produce machine code. It should be clear that the code is not generated to fulfill an user demand or functionality. This code is generated so that relocations can be easily located and patched.
+	\paragraph{}The typical one would be to use a compiler, which translates high-level language source code into machine code. However, the author of the code does not have control on the byte output but as a merely optimizer advisor.
+	\paragraph{}Another plausible option is to use an assembler, which receives the text representation of the machine code as input and also produces machine code. Nevertheless, it has the same problem as the compiler use case: the user has no control over what bytes are generated and where the relocations start and end.
+	\paragraph{}Finally, the last option I explored and which I ended up choosing was to emitting the machine code by encoding the instruction bytes directly. This option gives me the best control over the code generated. I am in charge of every byte of the machine code. Relocation start and ends (therefore sizes as well) are known.
+	\paragraph{}This has the disadvantage of not being very scalable and the code generated is not worthwhile aside from being food for the linker and the loader. Yet the goal of this work is to research linking and loading technology, not to produce useful code to be linked or loaded, so the trade-off is acceptable.
+	\paragraph{}The instructions in this work are encoded directly, as mentioned above. However, although I am somewhat familiar with x86\_64 encoding, the task has been performed with the help of an assembler. As a disclaimer, the encoding of the instructions is not intended to be a full-fledged assembler, but rather the necessary tool for the task at hand.
+	\paragraph{}There are a couple of resources which assisted me greatly in this regard.
+	\paragraph{}The first one is an online assembler for x86 and x86\_64\cite{online-assembler}. It internally uses GCC and objdump to transform the assembly source code into encoded bytes.
+	\paragraph{}The second one is Godbolt, a website which is great to explore code optimization and generation\cite{godbolt}. The last one allows to choose the programming language, the compiler and its invocation arguments as well as extra visualizations.
+	\paragraph{}On the other hand, Zig is a nice language that lets you execute most of the code at compile time (as long as they can be executed in a virtual machine with no target-specific instruction or function call). While I will not be using complicated \verb|comptime| (the keyword in Zig for compile time execution) code, some samples are listed following this paragraph to show what Zig is capable of in this regard, remarking the fact that Zig has no preprocessor within their tools:
 	
+	\begin{itemize}
+		\item The bytes to returning 32-bit zero in x86\_64. Here the \verb|++| operator works to concatenate arrays at compile time.
+		\begin{verbatim}
+const xor_eax_eax = [_]u8{0x31, 0xc0};
+const ret = [1]u8{0xc3};
+			
+const ret0 = xor_eax_eax ++ ret;
+		\end{verbatim}
+		\item A function to generate the encoding of a 32-bit \verb|mov| to the general-purpose register \verb|eax|, which can be invoked at compile time:
+		\begin{verbatim}
+fn mov_eax_imm32(imm32: u32) [5]u8 {
+	return [1]u8{0xb8} ++ @as(*const [4]u8, @ptrCast(&imm32)).*;
+}
+		\end{verbatim}
+		\item At last, the whole function to generate the encoding for the main function (the entry point), shared for both the library and executable samples from the testbed.
+		\begin{verbatim}
+const main_print_library_code = 
+// Set up the stack
+mov_rsp_rdi ++
+// Call the function to get the number
+// (this contains an unresolved relocation)
+call(0) ++
+// Format the decimal digit as an ASCII character
+// (this number is inside a 32-bit register)
+add_eax_imm8('0') ++
+// Mov the 32-bit into the data section
+// so that it can be printed (this contains an unresolved relocation)
+mov_rip_mem_eax(0) ++ 
+// 1 - write syscall id
+mov_eax_imm32(1) ++
+// 1 - file descriptor: stdout
+mov_edi_imm32(1) ++
+// Move that character buffer pointer
+// as first argument (this contains an unresolved relocation)
+lea_rsi_rip_mem(0) ++ 
+// 1 - stdout file descriptor
+mov_edx_imm32(1) ++
+// write(stdout, &buffer, 1);
+syscall ++
+// exit(0);
+xor_edi_edi ++
+mov_eax_imm32(231) ++
+syscall;
+		\end{verbatim}
+	\end{itemize}
+
+	\paragraph{}These are the relevant bits in regard to machine code generation. When generating the executable, these bytes are appended to the code section. A similar approach is followed when generated non-code section data. For example, when generating a symbol in the data section, the desired bytes for symbol are written in the same fashion to the end of the section.
+	\paragraph{}For relocations, as stated before, 4 bytes will be used. Unresolved relocations will leave the 4-byte operand as zero. The location of the patch will depend on the type of relocation: if it is internal (where the target symbol is located in the same binary unit) or external (for instance, the target symbol belongs to another file). Internal relocations take no metadata space in disk since they can be resolved before writing the binary file to disk or loading a program to memory. External relocations belong to their own section.
+	
+	\subsection{Loader and linker implementation}
+	
+	\paragraph{} On most operating systems (and Linux is no exception), the executable loader belongs in the kernel. Unfortunately, the scope and time limitation for this project make it impossible to face such a 
+	change in addition to the ones already done.
+	
+	\subsubsection{Executing a program from userspace in a virtual memory system}
+	\paragraph{}Still, there is an option on modern systems to achieve a similar result from userspace invoking the virtual memory system API. This is, to reserve and commit a region of virtual memory with special permissions, so that it's possible to execute code from that region.
+	\paragraph{}Such functionality is fulfilled by the \verb|mmap| system call on Linux\cite{mmap} and POSIX systems. A roughly equivalent API on Windows is provided by \verb|VirtualAlloc|\cite{virtual-alloc}. An additional benefit of this system call is that, if the correct flags are specified, the memory is private to the process and is zero initialized. Thus the way to accomplish a functional loader and linker is to use this API.
+	\paragraph{}This API could be used in separate parts, by first reserving the memory (using the \verb|PROT_NONE| flag) and then committing using a different system call, \verb|mprotect|, which allows to change the protection flags for an specific virtual memory region that has already been reserved. While this API is useful to have pointer-stable arrays which require no copy when growing, the usefulness for this work 
+	is limited and I will stick to the first option.
+	
+	\subsubsection{Linker and loader code overview}
+	
+	\paragraph{}In the prototype of linker and loader developed for this work, there are some funcionalities that needed to be covered:
+	\begin{itemize}
+		\item Given some inputs, serialize to disk a file with the new format containing the desired code and data. This functionality is covered by the \verb|write_binary| function.
+		\item Link a binary (\verb|link|). Library/object inputs are described in the executable itself, so the linker is able to pick it up, open the corresponding file from disk and include the necessary functionality in the final binary. This works for both static and dynamic linking. In the case of static linking, the binary can be optionally serialized to disk.
+		\item Loading functionality, from both memory (\verb|load_from_memory|) and disk (\verb|load_from_disk|). This uses the aforementioned method to allocate virtual memory with execution permissions.
+
+	\end{itemize}
+	\paragraph{}In the following subsections these three parts of the implementation will be described more in detail.
+	
+	\subsubsection{Producing a binary file}
+	\paragraph{}
+	The function \verb|write_binary| receives as inputs:
+	\begin{itemize}
+		\item The output file path.
+		\item An array of sections, each of them containing:
+		\begin{itemize}
+			\item An array of symbols, each of them formed by a name and the content in bytes.
+			\item The section id, which can be one the following: \verb|code|, \verb|data|, \verb|internal_table|, \verb|data|, \verb|internal_table|, \verb|external_table|,\\ \verb|relocations|, \verb|symbol_table|, \verb|string_table|, \verb|library|.
+			\item Read, write and execute flags.
+			\item An alignment attribute which defaults to 4.
+		\end{itemize}
+		\item An array of internal relocations, which is information for the linker to resolve before writing the file to disk or loading the binary for execution.
+		\item An array of libraries to be imported, each of them containing its name and a list of symbol names to be imported.
+		\item An array of external relocations referenced by the unit/module code, to be resolved later at linking stage.
+		\item A reference to the entry point, represented by the symbol and section indices.
+		\item An enumerator to indicate whether the binary is an executable or a library.
+	\end{itemize}
+	\paragraph{}Given this set of inputs, the \verb|write_binary| function is able to encode a working binary. In addition, it will resolve internal relocations and generate the convenient extra sections, such as the symbol and string tables.
+	
+	\subsubsection{Linking binaries together}
+	\paragraph{}The \verb|link| function serves as a dynamic and static linker, since the procedure is identical.
+	\paragraph{}The main file to be linked is read from disk, although it could easily be adapted to operate directly from memory.
+	\paragraph{}First, the section headers are iterated in search of interesting sections to perform the linking.
+	\paragraph{}Once they are examined, it is checked that if relocations exist, an external table exists and vice versa. On the contrary, if there are not any relocations, there must not be an external table and vice versa.
+	\paragraph{}If there are any relocations to be made, the pertinent content from the interesting sections is fetched and relocations are iterated over.
+	\paragraph{}For each relocation, the following steps are taken:
+	\begin{itemize}
+		\item Fetch the destination library name and symbol name.
+		\item Search through the libraries that are already cached to find by name.
+		\item If the library is not already cached, load it from disk and add them to the list of cached libraries. Append it to the final file buffer (for the time being the binaries are linked altogether).
+		\item Fetch relevant sections from the library (string and symbol table).
+		\item Search through the symbols by name.
+		\item When found, obtain the necessary data to perform the relocation and make it as if it were internal. Break the symbol search loop, jumping back to the loop header to perform a new relocation iteration if applicable.
+	\end{itemize}
+	
+	If the user provides a path, then the \verb|link| function must write the binary to a file with the specified path.
+	
+	\subsubsection{Loading functionality}
+	\paragraph{}This functionality is the most straightforward of the three. A couple of functions are provided to load from file and from memory.
+	\paragraph{}The first similarity is utilizing a virtual memory region with execution permission to load the full file to it. Note that in order to load a binary for execution, the file must be fully linked, so there must be no relocations in it.
+	\paragraph{}Part of loading an executable is also providing a stack the code loaded can use. For this reason, a new call to \verb|mmap| is made to allocate a decent amount of memory (this time without execution permission).
+	\paragraph{}In the end, the header is fetched and the entry point address is computed and cast into a function pointer with \verb|noreturn| return type. I thought since this is only a prototype it was not worth the trouble to be able to return from the binary (since this is the natural behavior of executables, they do not return), so the exit procedure is fully contained inside the binary. This way, any code from the linker/loader after the jump to the binary is made will not be run.
+	
+	\subsubsection{A simple testbed}
+	\paragraph{}The samples for testing are two, an executable and a library.
+	\paragraph{}The dummy functionality used as a testbed is to provide a function which returns 5 as a 32-bit integer. This code belongs to the library. Both the executable and the library contain a shared (in the sense that the code is roughly the same) entry point function which interoperates with this library function. Roughly speaking, the entry point calls the library function to obtain the desired number, formats it into ASCII, stores it into memory and prints the number to \verb|stdout|. The detailed steps are the following:
+	in the following manner:
+	\begin{itemize}
+		\item The stack is set up from the \verb|rdi| register.
+		\item Call into the library function (if it comes from the executable, such relocation is external; otherwise, internal).
+		\item After the call, the return value is inside the \verb|eax| register, so in order to format it as an ASCII character, it needs to be added to the value for \verb|'0'|.
+		\item Once the number is formated in ASCII, it is stored into the data section memory (in order to print to \verb|stdout| the number, it needs to reside in memory). For this memory address an internal relocation is needed.
+		\item When the value is properly stored, the syscall arguments are prepared and the CPU is told to run the \verb|syscall| instruction itself.
+		\item Finally, another syscall is made to exit the process.
+	\end{itemize}
+	
+	\paragraph{}Since libraries in this format can have an entry point associated with the related functionality the library itself provides, the test entry point is shared in both the executable and the library, with the unique difference of the relocation kind.
+	\paragraph{}When the executable is linked, the linker must pull the library from disk and link it against the executable. If the library is produced, only the internal relocation needs to be resolved and no call to the \verb|link| function is needed, since the \verb|write_binary| function resolves any internal relocation.
+	
+	\paragraph{}Below some help regarding on how the codebase can be tested is provided.
+	\paragraph{}To write and execute only the library, the \verb|execution_type| constant must be set to \verb|Header.Kind.library|.
+	\paragraph{}On the other hand, to produce both the executable and the library and link them together, the \verb|execution_type| constant must be set to\\ \verb|Header.Kind.executable| (this is the default value).
+	\paragraph{}Another choice is given when linking the executable: whether it should be linked statically or dynamically. Such option is controlled by the constant \verb|linkage|. To go for static linkage, the value of this symbol must be \verb|Header.Linkage.static|. On the contrary, for dynamic linking, the required value is \verb|Header.Linkage.dynamic|.
+	\newpage
 	\section{Results}
 	\paragraph{}TODO
 	
+	\newpage
 	\section{Conclusion and Future Work}
 	\paragraph{}TODO
 	
+	\newpage
 	\section{Glossary}
 	\paragraph{}TODO
 
+	\newpage
 	\begin{thebibliography}{9}
 		\bibitem{self} \href{https://github.com/davidgm94/modern-machine-code-format/}{https://github.com/davidgm94/modern-machine-code-format/}\\
 		Retrieved 28 May 2024.
@@ -197,6 +366,12 @@
 		\bibitem{lemire-energy}
 		\href{https://lemire.me/blog/2024/02/19/measuring-energy-usage-regular-code-vs-simd-code}{https://lemire.me/blog/2024/02/19/measuring-energy-usage-regular-code-vs-simd-code/}\\
 		Retrieved 28 May 2024.
+		\bibitem{zig}
+		\href{https://ziglang.org/}{https://ziglang.org/}\\
+		Retrieved 02 June 2024.
+		\bibitem{zig-download}
+		\href{https://ziglang.org/download}{https://ziglang.org/download}\\
+		Retrieved 02 June 2024.
 		\bibitem{elf-spec}
 		\href{https://refspecs.linuxfoundation.org/elf/elf.pdf}{https://refspecs.linuxfoundation.org/elf/elf.pdf}\\
 		Retrieved 29 May 2024.
@@ -212,17 +387,17 @@
 		\bibitem{lazy-bindings}
 		\href{https://www.qnx.com/developers/docs/8.0/com.qnx.doc.neutrino.prog/topic/devel_Lazy_binding.html}{https://www.qnx.com/developers/docs/8.0/com.qnx.doc.neutrino.prog/topic/devel\_Lazy\_binding.html}\\
 		Retrieved 30 May 2024.
+		\bibitem{online-assembler}
+		\href{https://defuse.ca/online-x86-assembler.htm}{https://defuse.ca/online-x86-assembler.htm}\\
+		Retrieved 01 June 2024.
+		\bibitem{godbolt}
+		\href{https://godbolt.org/}{https://godbolt.org/}\\
+		Retrieved 01 June 2024.
+		\bibitem{mmap}
+		\href{https://man7.org/linux/man-pages/man2/mmap.2.html}{https://man7.org/linux/man-pages/man2/mmap.2.html}\\
+		Retrieved 01 June 2024.
+		\bibitem{virtual-alloc}
+		\href{https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc}{https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc}\\
+		Retrieved 01 June 2024.
 	\end{thebibliography}
-
-	% Extra sources:
-	%How programs get run
-	%https://lwn.net/Articles/630727/
-	%How programs get run: ELF binaries
-	%https://lwn.net/Articles/631631/
-	%GCC codegen options
-	%https://gcc.gnu.org/onlinedocs/gcc/Code-Gen-Options.html
-	% Computer Science from the Bottom Up. Chapter 9. Dynamic linking
-	%https://bottomupcs.sourceforge.net/csbu/c3673.htm
-	%All about Global Offset Table
-	%https://maskray.me/blog/2021-08-29-all-about-global-offset-table
 \end{document}
