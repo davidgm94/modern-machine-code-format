@@ -326,7 +326,6 @@ fn write_binary(allocator: Allocator, options: WriteBinaryOptions) !void {
                     .length = @intCast(symbol.name.len),
                 },
             };
-            std.debug.print("{s} symbol (section {}): {s}\n", .{options.path, section_index, symbol.name});
             try symbol_table_symbols.append(allocator, symbol_info);
             try string_table.appendSlice(allocator, symbol.name);
             array_list.appendSliceAssumeCapacity(symbol.bytes);
@@ -376,7 +375,6 @@ fn write_binary(allocator: Allocator, options: WriteBinaryOptions) !void {
             try string_table.appendSlice(allocator, library.name);
 
             for (library.symbols) |symbol| {
-                std.debug.print("(relocation) {s} symbol (library {}, symbol {}): {s}\n", .{options.path, library_i, symbol_table_symbols.items.len, symbol});
                 try symbol_table_symbols.append(allocator, .{
                     // Unused field
                     .section = 0,
